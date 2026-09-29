@@ -23,7 +23,6 @@ const PARIS_TZ = "Europe/Paris";
 const MAX_PLAYER_PICKS = 3;
 const POINTS = { outcome: 2, exactScore: 5, scorer: 3, assist: 3 };
 
-// Effectif masculin PSG 2026-2027.
 const PSG_SQUAD = [
   { name: "Achraf Hakimi", number: 2 },
   { name: "Lucas Beraldo", number: 4 },
@@ -53,7 +52,7 @@ const PSG_SQUAD = [
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-// Les données sont en mémoire et disparaissent au redémarrage du bot.
+// Données conservées en mémoire. Un redémarrage du bot les efface.
 const matches = new Map();
 const predictions = new Map();
 const sessions = new Map();
@@ -87,8 +86,7 @@ function parseParisDate(value) {
 
 function parseScore(value) {
   const match = value.trim().match(/^(\d{1,2})\s*[-–:]\s*(\d{1,2})$/);
-  if (!match) return null;
-  return [Number(match[1]), Number(match[2])];
+  return match ? [Number(match[1]), Number(match[2])] : null;
 }
 
 function tr(language, french, english) {
@@ -96,17 +94,8 @@ function tr(language, french, english) {
 }
 
 function outcomeLabel(outcome, language = "fr") {
-  const french = {
-    win: "Victoire du PSG",
-    draw: "Match nul",
-    loss: "Défaite du PSG",
-  };
-  const english = {
-    win: "PSG win",
-    draw: "Draw",
-    loss: "PSG lose",
-  };
-
+  const french = { win: "Victoire du PSG", draw: "Match nul", loss: "Défaite du PSG" };
+  const english = { win: "PSG win", draw: "Draw", loss: "PSG lose" };
   return (language === "en" ? english : french)[outcome];
 }
 
@@ -121,7 +110,6 @@ function getActualOutcome(homeGoals, awayGoals, homeTeam, awayTeam) {
 
   const psgGoals = homeIsPsg ? homeGoals : awayGoals;
   const otherGoals = homeIsPsg ? awayGoals : homeGoals;
-
   return psgGoals > otherGoals ? "win" : psgGoals < otherGoals ? "loss" : "draw";
 }
 
@@ -160,22 +148,22 @@ function matchEmbed(match) {
   const english = match.language === "en";
 
   const intro = english
-    ? `${PSG_EMOJI} **Your turn!**\nMake your prediction and climb the overall leaderboard.\n\n`
-    : `${PSG_EMOJI} **À toi de jouer !**\nFais ton pronostic et grimpe au classement général.\n\n`;
+    ? `${PSG_EMOJI} **Your turn!**\nMake your prediction and climb the overall leaderboard 🏆\n\n`
+    : `${PSG_EMOJI} **À toi de jouer !**\nFais ton pronostic et grimpe au classement général 🏆\n\n`;
 
   const schedule = english
-    ? `Kick-off: **${kickoff.toFormat("cccc d LLLL · HH:mm", { locale: "en" })}**\nPredictions close: **${closes.toFormat("cccc d LLLL · HH:mm", { locale: "en" })}**\n\nThe top players will be rewarded.`
-    : `Coup d’envoi : **${kickoff.toFormat("cccc d LLLL · HH:mm", { locale: "fr" })}**\nClôture des pronostics : **${closes.toFormat("cccc d LLLL · HH:mm", { locale: "fr" })}**\n\nLes meilleurs seront récompensés.`;
+    ? `🕒 Kick-off: **${kickoff.toFormat("cccc d LLLL · HH:mm", { locale: "en" })}**\n🔒 Predictions close: **${closes.toFormat("cccc d LLLL · HH:mm", { locale: "en" })}**\n\n🏆 The top players will be rewarded.`
+    : `🕒 Coup d’envoi : **${kickoff.toFormat("cccc d LLLL · HH:mm", { locale: "fr" })}**\n🔒 Clôture des pronostics : **${closes.toFormat("cccc d LLLL · HH:mm", { locale: "fr" })}**\n\n🏆 Les meilleurs seront récompensés.`;
 
   const embed = new EmbedBuilder()
     .setColor(0x004170)
     .setTitle(`${match.homeTeam} vs ${match.awayTeam}`)
     .setDescription(intro + schedule)
     .addFields({
-      name: english ? "Scoring" : "Barème",
+      name: english ? "🎯 Scoring" : "🎯 Barème",
       value: english
-        ? `Correct result: **+${POINTS.outcome} pts**\nExact score: **+${POINTS.exactScore} pts**\nPSG scorer(s): **+${POINTS.scorer} pts**\nPSG assist(s): **+${POINTS.assist} pts**`
-        : `Bon résultat : **+${POINTS.outcome} pts**\nScore exact : **+${POINTS.exactScore} pts**\nButeur(s) du PSG : **+${POINTS.scorer} pts**\nPasseur(s) du PSG : **+${POINTS.assist} pts**`,
+        ? `✅ Correct result: **+${POINTS.outcome} pts**\n🎯 Exact score: **+${POINTS.exactScore} pts**\n⚽ PSG scorer(s): **+${POINTS.scorer} pts**\n👟 PSG assist(s): **+${POINTS.assist} pts**`
+        : `✅ Bon résultat : **+${POINTS.outcome} pts**\n🎯 Score exact : **+${POINTS.exactScore} pts**\n⚽ Buteur(s) du PSG : **+${POINTS.scorer} pts**\n👟 Passeur(s) du PSG : **+${POINTS.assist} pts**`,
     })
     .setFooter({ text: english ? "PSG Match Predictions" : "Pronostics PSG" });
 
@@ -403,7 +391,10 @@ async function openPrediction(interaction, matchId) {
   const match = matches.get(matchId);
 
   if (!match || match.status !== "open" || Date.now() >= match.closesAt) {
-    return interaction.reply({ content: "🔒 Les pronostics sont clôturés.", ephemeral: true });
+    return interaction.reply({
+      content: "🔒 Les pronostics sont clôturés.",
+      ephemeral: true,
+    });
   }
 
   const existing = predictions.get(matchId)?.get(interaction.user.id);
@@ -471,9 +462,7 @@ async function handleSelect(interaction, type, matchId) {
       });
     }
 
-    if (field === "score") {
-      return interaction.showModal(scoreModal(matchId));
-    }
+    if (field === "score") return interaction.showModal(scoreModal(matchId));
 
     if (field === "scorers" || field === "assisters") {
       const menu = playerMenu(matchId, field);
@@ -497,9 +486,7 @@ async function handleSelect(interaction, type, matchId) {
     session[type] = interaction.values;
 
     if (type === "scorers") {
-      if (session.assisters) {
-        return interaction.update(recapPayload(match, session));
-      }
+      if (session.assisters) return interaction.update(recapPayload(match, session));
 
       return interaction.update({
         content: "**4/4 · Passeurs décisifs du PSG**\nChoisis de 1 à 3 joueurs, ou « Aucun ».",
@@ -592,7 +579,7 @@ async function viewPrediction(interaction, matchId) {
     content:
       `**${PSG_EMOJI} Ton pronostic · ${match.homeTeam} vs ${match.awayTeam}**\n\n` +
       `🎯 Résultat : **${outcomeLabel(pick.outcome)}**\n🔢 Score : **${pick.scoreHome}-${pick.scoreAway}**\n` +
-      `⚽ Buteur(s) : **${displayPlayers(pick.scorers)}**\n🅰️ Passeur(s) : **${displayPlayers(pick.assisters)}**\n\n` +
+      `⚽ Buteur(s) : **${displayPlayers(pick.scorers)}**\n👟 Passeur(s) : **${displayPlayers(pick.assisters)}**\n\n` +
       (match.status === "settled"
         ? `🏆 Points gagnés : **${pick.points} pts**`
         : "🔒 Prono validé et verrouillé."),
@@ -605,10 +592,7 @@ function leaderboardRows() {
 
   for (const [matchId, matchPicks] of predictions) {
     const match = matches.get(matchId);
-
-    if (!match || match.status !== "settled" || (match.settledAt || 0) <= leaderboardResetAt) {
-      continue;
-    }
+    if (!match || match.status !== "settled" || (match.settledAt || 0) <= leaderboardResetAt) continue;
 
     for (const pick of matchPicks.values()) {
       const row = table.get(pick.userId) || {
@@ -631,8 +615,7 @@ function leaderboardRows() {
 function leaderboardEmbed(language = "fr") {
   const rows = leaderboardRows();
   const description = rows.length
-    ? rows
-        .slice(0, 10)
+    ? rows.slice(0, 10)
         .map((row, index) => `**${index + 1}.** <@${row.userId}> — **${row.points} pts**`)
         .join("\n")
     : tr(
@@ -644,9 +627,7 @@ function leaderboardEmbed(language = "fr") {
   return new EmbedBuilder()
     .setColor(0x004170)
     .setTitle(tr(language, "CLASSEMENT GÉNÉRAL", "OVERALL LEADERBOARD"))
-    .setDescription(
-      `${description}\n\n${tr(language, "Les meilleurs seront récompensés.", "The top players will be rewarded.")}`,
-    )
+    .setDescription(`${description}\n\n🏆 ${tr(language, "Les meilleurs seront récompensés.", "The top players will be rewarded.")}`)
     .setFooter({
       text: tr(language, "Top 10 · Clique pour voir ta position", "Top 10 · Click to see your rank"),
     })
@@ -680,27 +661,17 @@ async function updateLeaderboard(interaction) {
       const oldMessage = await channel.messages.fetch(leaderboardMessage.id).catch(() => null);
 
       if (oldMessage) {
-        await oldMessage.edit({
-          embeds: [leaderboardEmbed(language)],
-          components,
-        });
+        await oldMessage.edit({ embeds: [leaderboardEmbed(language)], components });
       } else {
-        const sent = await channel.send({
-          embeds: [leaderboardEmbed(language)],
-          components,
-        });
+        const sent = await channel.send({ embeds: [leaderboardEmbed(language)], components });
         leaderboardMessage = { channelId: channel.id, id: sent.id };
       }
     } else {
-      const sent = await channel.send({
-        embeds: [leaderboardEmbed(language)],
-        components,
-      });
+      const sent = await channel.send({ embeds: [leaderboardEmbed(language)], components });
       leaderboardMessage = { channelId: channel.id, id: sent.id };
     }
 
     leaderboardLanguage = language;
-
     return interaction.editReply(
       tr(language, "Classement général publié / actualisé.", "Overall leaderboard published / refreshed."),
     );
@@ -1146,7 +1117,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           if (!pick || !match) continue;
 
           lines.push(
-            `**${match.homeTeam} vs ${match.awayTeam}**\n${outcomeLabel(pick.outcome)} · ${pick.scoreHome}-${pick.scoreAway}\n⚽ ${displayPlayers(pick.scorers)} · 🅰️ ${displayPlayers(pick.assisters)}\n${match.status === "settled" ? `🏆 ${pick.points} pts` : "🔒 Validé"}`,
+            `**${match.homeTeam} vs ${match.awayTeam}**\n${outcomeLabel(pick.outcome)} · ${pick.scoreHome}-${pick.scoreAway}\n⚽ ${displayPlayers(pick.scorers)} · 👟 ${displayPlayers(pick.assisters)}\n${match.status === "settled" ? `🏆 ${pick.points} pts` : "🔒 Validé"}`,
           );
         }
 
